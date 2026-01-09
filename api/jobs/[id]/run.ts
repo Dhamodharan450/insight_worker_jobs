@@ -1,10 +1,9 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { PrismaClient } from '@prisma/client';
 import { processJob } from '../../../src/insight.worker';
 
 const db = new PrismaClient();
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const { id } = req.query as { id?: string };
   if (!id) return res.status(400).json({ error: 'missing id' });
