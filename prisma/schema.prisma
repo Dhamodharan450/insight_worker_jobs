@@ -1,0 +1,1262 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum activeStatus {
+  active
+  inactive
+  deleted
+}
+
+enum workspaceRole {
+  admin
+  user
+}
+
+enum agentType {
+  assistant
+  user
+}
+
+enum accessType {
+  granted
+  revoked
+}
+
+enum dashboardEditAccess {
+  edit
+  view
+  owner
+}
+
+enum testingType {
+  correct
+  incorrect
+  clarification_needed
+}
+
+enum reportType {
+  graph
+  table
+  card
+}
+
+enum intent_types {
+  direct
+  follow_up
+  unrelated
+  meta
+}
+
+enum QueryEvaluationStatus {
+  correct
+  PartiallyCorrect
+  Incorrect
+  null
+}
+
+enum dbTypes {
+  postgresql
+  bigquery
+  mssql
+}
+
+enum Shape {
+  rectangle
+  circle
+  line
+  oval
+  triangle
+}
+
+enum scheduleReportFrequency {
+  hourly
+  daily
+  weekly
+  monthly
+}
+
+enum scheduleReportStatus {
+  active
+  inactive
+}
+
+enum actionType {
+  teams
+  slack
+  gmail
+}
+
+model user {
+  id                    String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email                 String             @unique
+  phone_number          String?
+  email_verified        Boolean            @default(false)
+  phone_number_verified Boolean            @default(false)
+  name                  String?
+  picture               String?
+  password              String
+  job_title             String?
+  timezone              String?
+  is_active             activeStatus       @default(active)
+  created_at            DateTime           @default(now())
+  updated_at            DateTime           @default(now()) @updatedAt
+  meta_data             Json?
+  application           application[]
+  chat_room             chat_room[]
+  application_user      application_user[]
+  group_user            group_user[]
+  groups                groups[]
+  folder                folder[]
+
+  workspace_users             workspace_users[]
+  user_chat_activity_logs     user_chat_activity_logs[]
+  dashboard_reports           dashboard_reports[]
+  reportScheduleJob           reportScheduleJob[]
+  dashboards                  dashboard[]                   @relation("DashboardOwner")
+  lastOpenedDashboards        dashboard[]                   @relation("DashboardLastOpenedBy")
+  lastEditedDashboards        dashboard[]                   @relation("DashboardLastEditedBy")
+  dashboard_permissions       dashboard_permissions_users[] @relation("dashboard_permissions_user")
+  dashboard_permissions_users dashboard_permissions_users[] @relation("DashboardInvitedBy")
+  dashboard_edit_history      dashboard_edit_history[]      @relation("DashboardEditorHistory")
+  group_edit_history          group_edit_history[]          @relation("GroupEditorHistory")
+  app_created_user            application[]                 @relation("AppOwnerTrack")
+  app_edit_history            app_edit_history[]            @relation("AppEditorHistory")
+  invitedUserForApp           application_user[]            @relation("InvitedUserForApp")
+  invitedUserForGroup         group_user[]                  @relation("InvitedUserForGroup")
+  invitedUserForWorkspace     user_invites[]                @relation("InvitedUserForWorkspace")
+  workflow_session            workflow_session[]            @relation("WorkflowSession")
+  wallet                      wallet[]                      @relation("WalletAdmin")
+  walletTransaction           walletTransaction[]           @relation("WalletTransactionBy")
+  context_folder              context_folder[]
+  notification                notification[]
+  no_of_insight_schedule      Int?      @default(5)
+no_of_schedule_used         Int?      @default(0)
+  report_filter report_filter[]
+}
+
+model user_invites {
+  id               String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  role             workspaceRole @default(user)
+  application_role workspaceRole @default(user)
+  group_role       workspaceRole @default(user)
+  user_mail        String
+  invited_by       String?       @db.Uuid
+  application_id   String        @db.Uuid
+  group_id         String        @db.Uuid
+  is_active        activeStatus  @default(active)
+  created_at       DateTime      @default(now())
+  updated_at       DateTime      @default(now()) @updatedAt
+  meta_data        Json?
+  application      application   @relation(fields: [application_id], references: [id], onDelete: Cascade)
+  groups           groups        @relation(fields: [group_id], references: [id])
+  invitedUser      user?         @relation("InvitedUserForWorkspace", fields: [invited_by], references: [id])
+}
+
+model workspace_users {
+  id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspace_id String?       @db.Uuid
+  user_id      String        @db.Uuid
+  user_type    workspaceRole @default(user)
+  is_active    activeStatus  @default(active)
+  created_at   DateTime      @default(now())
+  updated_at   DateTime      @default(now()) @updatedAt
+  meta_data    Json?
+  workspace    workspace?    @relation(fields: [workspace_id], references: [id])
+  user         user          @relation(fields: [user_id], references: [id])
+
+  @@index([workspace_id, user_id])
+}
+
+model application {
+  id                           String                         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                         String                         @default("")
+  description                  String?                        @default("")
+  workspace_id                 String?                        @db.Uuid
+  is_active                    activeStatus                   @default(inactive)
+  is_trained                   Boolean?                       @default(false)
+  created_at                   DateTime                       @default(now())
+  updated_at                   DateTime                       @default(now()) @updatedAt
+  meta_data                    Json?
+  prompt                       String?
+  created_by_user_id           String?                        @db.Uuid
+  workspace                    workspace?                     @relation(fields: [workspace_id], references: [id])
+  app_created_user             user?                          @relation("AppOwnerTrack", fields: [created_by_user_id], references: [id])
+  data_table                   data_table[]
+  data_source_attribute_values data_source_attribute_values[]
+  chat_room                    chat_room[]
+  testing_insight              testing_insight[]
+  application_user             application_user[]
+  groups                       groups[]
+  group_user                   group_user[]
+  user                         user[]
+  user_invites                 user_invites[]
+  folder                       folder[]
+  insights                     insights[]
+  dashboard_reports            dashboard_reports[]
+  test_evaluation_group        test_evaluation_group[]
+  category                     category[]
+  app_edit_history             app_edit_history[]
+  prescriptive_insights        prescriptive_insights[]
+  workflow_session             workflow_session[]
+  context_folder               context_folder[]
+  kpi                          kpi[]
+  insight_v2                   insight_v2[]
+  notification                 notification[]
+  report_filter report_filter[]
+}
+
+model app_edit_history {
+  id                String      @id @default(uuid())
+  appId             String      @db.Uuid
+  userId            String      @db.Uuid
+  editedAt          DateTime    @default(now())
+  module            String? 
+  changeType        String 
+  changeDescription String? 
+  previousValues    Json? 
+  newValues         Json? 
+  endpoint          String? 
+  application       application @relation(fields: [appId], references: [id])
+  user              user        @relation("AppEditorHistory", fields: [userId], references: [id])
+}
+
+model application_user {
+  id            String        @id @default(uuid())
+  applicationId String        @db.Uuid
+  userId        String        @db.Uuid
+  invited_by    String?       @db.Uuid
+  role          workspaceRole @default(user)
+  isActive      activeStatus  @default(active)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @default(now()) @updatedAt
+  primary       Boolean?      @default(false)
+  metaData      Json?
+  application   application   @relation(fields: [applicationId], references: [id])
+  user          user          @relation(fields: [userId], references: [id])
+  invitedUser   user?         @relation("InvitedUserForApp", fields: [invited_by], references: [id])
+
+  @@index([applicationId, userId], name: "application_user_unique_index")
+}
+
+model insights {
+  id            String       @id @default(uuid())
+  applicationId String       @db.Uuid
+  topic         String
+  description   String
+  isActive      activeStatus @default(active)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @default(now()) @updatedAt
+  metaData      Json?
+  application   application  @relation(fields: [applicationId], references: [id])
+}
+
+model prescriptive_insights {
+  id                    String       @id @default(uuid())
+  applicationId         String       @db.Uuid
+  groupId               String?
+  topic                 String
+  description           String
+  metricName            String
+  value                 Float 
+  tableId               String? 
+  frequency             String 
+  category              String? 
+  fallback              String? 
+  unlocked              Boolean      @default(false)
+  sql_query             String 
+  breakdown_query       String? 
+  status                Boolean      @default(false) 
+  isActive              activeStatus @default(active)
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @default(now()) @updatedAt
+  metaData              Json?
+  application           application  @relation(fields: [applicationId], references: [id])
+  historical_data_query String?
+}
+
+model dashboard {
+  id               String       @id @default(uuid())
+  name             String
+  workspace_id     String
+  layout_position  Json?
+  userId           String       @db.Uuid
+  isActive         activeStatus @default(active)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @default(now()) @updatedAt
+  metaData         Json?
+  user             user         @relation("DashboardOwner", fields: [userId], references: [id])
+  lastOpenedBy     String?      @db.Uuid
+  lastOpenedAt     DateTime?
+  lastOpenedByUser user?        @relation("DashboardLastOpenedBy", fields: [lastOpenedBy], references: [id])
+  lastEditedBy     String?      @db.Uuid
+  lastEditedAt     DateTime?
+  lastEditedByUser user?        @relation("DashboardLastEditedBy", fields: [lastEditedBy], references: [id])
+  dashboardReports        dashboard_reports_junction[]
+  dashboard_text_element  dashboard_text_element[]
+  dashboard_image_element dashboard_image_element[]
+  dashboard_shape_element dashboard_shape_element[]
+  dashboard_permissions  dashboard_permissions_users[]
+  dashboard_edit_history dashboard_edit_history[]
+  dashboard_filter_junction dashboard_filter_junction[]
+}
+
+model dashboard_edit_history {
+  id                String    @id @default(uuid())
+  dashboardId       String
+  userId            String    @db.Uuid
+  editedAt          DateTime  @default(now())
+  module            String?
+  changeType        String
+  changeDescription String?
+  previousValues    Json?
+  newValues         Json?
+  endpoint          String?
+  dashboard         dashboard @relation(fields: [dashboardId], references: [id])
+  user              user      @relation("DashboardEditorHistory", fields: [userId], references: [id])
+
+  @@index([dashboardId])
+  @@index([userId])
+}
+
+model dashboard_permissions_users {
+  id            String              @id @default(uuid())
+  dashboardId   String
+  userId        String              @db.Uuid
+  accessLevel   dashboardEditAccess
+  lastOpenedAt  DateTime?
+  invitedBy     String?             @db.Uuid
+  invitedByUser user?               @relation("DashboardInvitedBy", fields: [invitedBy], references: [id])
+  dashboard     dashboard           @relation(fields: [dashboardId], references: [id])
+  user          user                @relation("dashboard_permissions_user", fields: [userId], references: [id])
+}
+
+model dashboard_reports {
+  id                   String       @id @default(uuid())
+  view_name            String
+  description          String?
+  type                 reportType
+  type_value           Json
+  sql                  String?
+  isJoinedTable        Boolean?     @default(false)
+  joinedTables         Json?
+  userQuery            String?
+  meta_data            Json?
+  layout_position      Json?
+  workspaceID          String
+  groupId              String?
+  dataTableId          String?
+  applicationId        String       @db.Uuid
+  userId               String       @db.Uuid
+  configuration_fields Json?
+  isDateRange          Boolean?
+  dateRangeValue       Json?
+  baseClauses          Json?
+  templateClauses      Json?
+  isActive             activeStatus @default(inactive)
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @default(now()) @updatedAt
+  application          application  @relation(fields: [applicationId], references: [id])
+  user                 user         @relation(fields: [userId], references: [id])
+  dashboards        dashboard_reports_junction[]
+  reportScheduleJob reportScheduleJob[]
+  report_filter_junction dashboard_reports_filter_junction[]
+}
+
+model report_filter {
+  id              String      @id @default(uuid())
+  label           String?
+  field           String
+  fieldType       String
+  operator        String?
+  description     String?
+  isGlobal        Boolean     @default(false)
+  defaultValue    Json?
+  distinctSQL     String?
+  cachedValues    Json?
+  lastFetchedAt   DateTime?
+  metaData        Json?
+  applicationId   String      @db.Uuid
+  tableName       String?
+  table_id        String?     @db.Uuid
+  table_column_id String?     @db.Uuid
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @default(now()) @updatedAt
+  createdById     String?     @db.Uuid
+  createdBy       user?       @relation(fields: [createdById], references: [id])
+  application     application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  data_table   data_table?                         @relation(fields: [table_id], references: [id])
+  table_column table_schema?                       @relation(fields: [table_column_id], references: [id])
+  reports      dashboard_reports_filter_junction[]
+  dashboards   dashboard_filter_junction[]
+}
+
+model dashboard_reports_filter_junction {
+  id           String            @id @default(uuid())
+  reportId     String
+  report       dashboard_reports @relation(fields: [reportId], references: [id])
+  filterId     String
+  filter       report_filter     @relation(fields: [filterId], references: [id])
+  isActive     activeStatus      @default(inactive)
+  isRequired   Boolean           @default(false)
+  defaultValue Json?
+  filterMeta   Json?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @default(now()) @updatedAt
+
+  @@unique([reportId, filterId])
+}
+
+model dashboard_filter_junction {
+  id           String        @id @default(uuid())
+  dashboardId  String
+  dashboard    dashboard     @relation(fields: [dashboardId], references: [id])
+  filterId     String
+  filter       report_filter @relation(fields: [filterId], references: [id])
+  isActive     activeStatus  @default(inactive)
+  defaultValue Json?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @default(now()) @updatedAt
+
+  @@unique([dashboardId, filterId])
+}
+
+model reportScheduleJob {
+  id            String                  @id @default(uuid())
+  userId        String                  @db.Uuid
+  reportId      String
+  nextRun       DateTime
+  frequency     scheduleReportFrequency
+  executionTime String
+  lastRun       DateTime?
+  startedAt     DateTime?
+  chatID        String?
+  meta_data     Json?
+  status        scheduleReportStatus    @default(active)
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @default(now()) @updatedAt
+  user          user                    @relation(fields: [userId], references: [id])
+  report        dashboard_reports       @relation(fields: [reportId], references: [id])
+}
+
+model dashboard_text_element {
+  id              String    @id @default(uuid())
+  dashboardId     String
+  layout_position Json
+  css_properties  Json?
+  content         String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @default(now()) @updatedAt
+  dashboard       dashboard @relation(fields: [dashboardId], references: [id])
+}
+
+model dashboard_image_element {
+  id              String    @id @default(uuid())
+  dashboardId     String
+  layout_position Json
+  css_properties  Json?
+  imgUrl          String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @default(now()) @updatedAt
+  dashboard       dashboard @relation(fields: [dashboardId], references: [id])
+}
+
+model dashboard_shape_element {
+  id              String    @id @default(uuid())
+  dashboardId     String
+  layout_position Json
+  css_properties  Json?
+  shape           Shape
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @default(now()) @updatedAt
+  dashboard       dashboard @relation(fields: [dashboardId], references: [id])
+}
+
+model dashboard_reports_junction {
+  dashboardId       String
+  dashboard         dashboard         @relation(fields: [dashboardId], references: [id])
+  dashboardReportId String
+  dashboard_reports dashboard_reports @relation(fields: [dashboardReportId], references: [id])
+  isActive          activeStatus      @default(active)
+  layout_position   Json?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @default(now()) @updatedAt
+
+  @@id([dashboardId, dashboardReportId])
+}
+
+model data_table {
+  id                       String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  table_name               String
+  schema_name              String?
+  data_source_id           String
+  description              String?          @default("")
+  application_id           String           @db.Uuid
+  group_id                 String?          @db.Uuid
+  is_considered            Boolean          @default(true)
+  is_changed               Boolean          @default(true)
+  is_trained               Boolean          @default(false)
+  is_active                activeStatus     @default(active)
+  created_at               DateTime         @default(now())
+  updated_at               DateTime         @default(now()) @updatedAt
+  meta_data                Json?
+  custom_description       String?
+  application              application      @relation(fields: [application_id], references: [id], onDelete: Cascade)
+  table_schema             table_schema[]
+  table_relation           table_relation[]
+  table_relation_reference table_relation[] @relation("referenced_table")
+  table_metrics            table_metrics[]
+  categories    data_table_category[]
+  kpi_tables    KpiTable[]
+  report_filter report_filter[]
+  @@index([application_id])
+}
+
+model data_table_category {
+  data_table_id String @db.Uuid
+  category_id   String @db.Uuid
+  data_table data_table @relation(fields: [data_table_id], references: [id], onDelete: Cascade)
+  category   category   @relation(fields: [category_id], references: [id], onDelete: Cascade)
+  @@id([data_table_id, category_id])
+}
+
+model category {
+  id          String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String                @unique
+  description String?               @default("")
+  dataTables  data_table_category[]
+  appID       String                @db.Uuid
+  created_at  DateTime              @default(now())
+  updated_at  DateTime              @default(now()) @updatedAt
+  kpi_id      String?               @db.Uuid
+  kpi         kpi?                  @relation(fields: [kpi_id], references: [id])
+  application application           @relation(fields: [appID], references: [id], onDelete: Cascade)
+}
+
+model table_schema {
+  id                       String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  field_name               String
+  type                     String?
+  description              String?
+  sample_data              String?
+  display_name             String?
+  data_table_id            String           @db.Uuid
+  group_id                 String?          @db.Uuid
+  is_considered            Boolean          @default(true)
+  is_active                activeStatus     @default(active)
+  created_at               DateTime         @default(now())
+  updated_at               DateTime         @default(now()) @updatedAt
+  meta_data                Json?
+  data_table               data_table       @relation(fields: [data_table_id], references: [id], onDelete: Cascade)
+  table_relation           table_relation[]
+  table_relation_reference table_relation[] @relation("referenced_column")
+  report_filter            report_filter[]
+  @@index([data_table_id])
+}
+
+model table_relation {
+  id                   String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  source_table_id      String        @db.Uuid
+  source_column_id     String        @db.Uuid
+  group_id             String?       @db.Uuid
+  referenced_table_id  String        @db.Uuid
+  referenced_column_id String        @db.Uuid
+  is_considered        Boolean       @default(false)
+  is_active            activeStatus  @default(active)
+  created_at           DateTime      @default(now())
+  updated_at           DateTime      @default(now()) @updatedAt
+  meta_data            Json?
+  source_table         data_table?   @relation(fields: [source_table_id], references: [id], onDelete: Cascade)
+  source_column        table_schema? @relation(fields: [source_column_id], references: [id], onDelete: Cascade)
+  referenced_table     data_table?   @relation("referenced_table", fields: [referenced_table_id], references: [id], onDelete: Cascade)
+  referenced_column    table_schema? @relation("referenced_column", fields: [referenced_column_id], references: [id], onDelete: Cascade)
+}
+
+model table_metrics {
+  id            String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  is_active     activeStatus @default(inactive)
+  created_at    DateTime     @default(now())
+  updated_at    DateTime     @default(now()) @updatedAt
+  meta_data     Json?
+  table_id      String       @db.Uuid
+  name          String
+  is_considered Boolean?     @default(true)
+  description   String?
+  calculation   String?
+  data_table    data_table   @relation(fields: [table_id], references: [id], onDelete: Cascade)
+}
+
+model data_source_attribute_values {
+  id                        String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  application_id            String       @db.Uuid
+  data_source_id            String       @db.Uuid
+  data_source_attributes_id String       @db.Uuid
+  value                     String
+  type                      String?      @default("string")
+  is_active                 activeStatus @default(active)
+  created_at                DateTime     @default(now())
+  updated_at                DateTime     @default(now()) @updatedAt
+  meta_data                 Json?
+  application               application  @relation(fields: [application_id], references: [id], onDelete: Cascade)
+  @@unique([application_id, data_source_id, data_source_attributes_id])
+  @@index([application_id, data_source_id, data_source_attributes_id])
+}
+
+model chat_room {
+  id                      String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  application_id          String                    @db.Uuid
+  user_id                 String                    @db.Uuid
+  title                   String?
+  is_title_generated      Boolean                   @default(false)
+  is_active               activeStatus              @default(active)
+  created_at              DateTime                  @default(now())
+  updated_at              DateTime                  @default(now()) @updatedAt
+  meta_data               Json?
+  application             application               @relation(fields: [application_id], references: [id], onDelete: Cascade)
+  user                    user                      @relation(fields: [user_id], references: [id])
+  chat                    chat[]
+  folder_chat_rooms       folder_chat_rooms[]
+  user_chat_activity_logs user_chat_activity_logs[]
+  @@index([application_id, user_id])
+}
+
+model chat {
+  id                      String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  message                 Json
+  summary                 String?
+  user_type               agentType
+  is_liked                Boolean?
+  sequence_no             Int?
+  message_count           Int?                      @default(0)
+  chat_room_id            String                    @db.Uuid
+  is_active               activeStatus              @default(active)
+  is_reset                Boolean                   @default(false)
+  created_at              DateTime                  @default(now())
+  updated_at              DateTime                  @default(now()) @updatedAt
+  meta_data               Json?
+  chat_room               chat_room                 @relation(fields: [chat_room_id], references: [id])
+  user_chat_activity_logs user_chat_activity_logs[]
+  self_model_evaluation   self_model_evaluation[]
+  workflow_session        workflow_session[]        @relation("WorkflowSessionChat")
+  message_v2              Json?
+  @@index([chat_room_id])
+}
+
+model folder {
+  id                String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name              String
+  application_id    String              @db.Uuid
+  user_id           String              @db.Uuid
+  is_active         activeStatus        @default(active)
+  created_at        DateTime            @default(now())
+  updated_at        DateTime            @default(now()) @updatedAt
+  meta_data         Json?
+  application       application         @relation(fields: [application_id], references: [id], onDelete: Cascade)
+  user              user                @relation(fields: [user_id], references: [id])
+  folder_chat_rooms folder_chat_rooms[]
+}
+
+model folder_chat_rooms {
+  id           String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  folder_id    String       @db.Uuid
+  chat_room_id String       @db.Uuid
+  is_active    activeStatus @default(active)
+  created_at   DateTime     @default(now())
+  updated_at   DateTime     @default(now()) @updatedAt
+  meta_data    Json?
+  chat_room    chat_room    @relation(fields: [chat_room_id], references: [id])
+  folder       folder       @relation(fields: [folder_id], references: [id])
+}
+
+model user_chat_activity_logs {
+  id            String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  chat_response String
+  chat_room_id  String       @db.Uuid
+  chat_id       String       @db.Uuid
+  user_id       String       @db.Uuid
+  is_active     activeStatus @default(active)
+  feedback      String?
+  created_at    DateTime     @default(now())
+  updated_at    DateTime     @default(now()) @updatedAt
+  meta_data     Json?
+  chat_room     chat_room    @relation(fields: [chat_room_id], references: [id])
+  chat          chat         @relation(fields: [chat_id], references: [id])
+  user          user         @relation(fields: [user_id], references: [id])
+}
+
+model self_model_evaluation {
+  id                String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  chat_id           String       @db.Uuid
+  model_name        String
+  input_question    String
+  sql               String?
+  relevent_schema   Json?
+  relevent_question Json?
+  intent_type       intent_types
+  token_usage       Int?
+  error_message     String?
+  group_id          String       @db.Uuid
+  feedback          String?
+  status            Boolean
+  created_at        DateTime     @default(now())
+  updated_at        DateTime     @default(now()) @updatedAt
+  chat              chat         @relation(fields: [chat_id], references: [id])
+}
+
+model testing_insight {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  question       String?
+  answer         String?
+  user_response  testingType
+  comments       String?
+  application_id String       @db.Uuid
+  is_active      activeStatus @default(active)
+  created_at     DateTime     @default(now())
+  updated_at     DateTime     @default(now()) @updatedAt
+  meta_data      Json?
+  application    application  @relation(fields: [application_id], references: [id], onDelete: Cascade)
+  @@index([application_id])
+}
+
+model config {
+  id         String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key        String
+  value      String
+  is_active  activeStatus @default(active)
+  created_at DateTime     @default(now())
+  updated_at DateTime     @default(now()) @updatedAt
+  meta_data  Json?
+}
+
+model groups {
+  id                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  group_name         String
+  application_id     String               @db.Uuid
+  all_schemas        Boolean?             @default(false)
+  is_active          activeStatus         @default(active)
+  created_by_user_id String               @db.Uuid
+  created_at         DateTime             @default(now())
+  updated_at         DateTime?            @default(now()) @updatedAt
+  meta_data          Json?
+  application        application          @relation(fields: [application_id], references: [id], onDelete: Cascade)
+  user               user                 @relation(fields: [created_by_user_id], references: [id])
+  group_user         group_user[]
+  user_invites       user_invites[]
+  group_edit_history group_edit_history[]
+}
+
+model group_edit_history {
+  id                String   @id @default(uuid())
+  groupId           String   @db.Uuid
+  userId            String   @db.Uuid
+  editedAt          DateTime @default(now())
+  module            String?
+  changeType        String
+  changeDescription String?
+  previousValues    Json?
+  newValues         Json?
+  endpoint          String?
+  groups            groups   @relation(fields: [groupId], references: [id])
+  user              user     @relation("GroupEditorHistory", fields: [userId], references: [id])
+}
+
+model group_user {
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  group_id       String        @db.Uuid
+  application_id String        @db.Uuid
+  user_id        String        @db.Uuid
+  invited_by     String?       @db.Uuid
+  role           workspaceRole @default(user)
+  is_active      activeStatus  @default(active)
+  created_at     DateTime      @default(now())
+  updated_at     DateTime?     @default(now()) @updatedAt
+  primary        Boolean?      @default(false)
+  meta_data      Json?
+  application    application   @relation(fields: [application_id], references: [id], onDelete: Cascade)
+  groups         groups        @relation(fields: [group_id], references: [id])
+  user           user          @relation(fields: [user_id], references: [id])
+  invitedUser    user?         @relation("InvitedUserForGroup", fields: [invited_by], references: [id])
+}
+
+model evaluation {
+  id                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  application_id     String               @db.Uuid
+  group_id           String?              @db.Uuid
+  question           String
+  corrected_sql      String?
+  status             String?
+  comments           String?
+  trained            Boolean?             @default(false)
+  is_verified        Boolean?             @default(false)
+  is_trained         Boolean?             @default(false)
+  isActive           activeStatus         @default(active)
+  created_at         DateTime             @default(now())
+  updated_at         DateTime?            @default(now()) @updatedAt
+  evaluation_results evaluation_results[]
+}
+
+model evaluation_results {
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  group_id    String       @db.Uuid
+  question_id String       @db.Uuid
+  message     Json
+  user_type   agentType
+  isActive    activeStatus @default(active)
+  created_at  DateTime     @default(now())
+  updated_at  DateTime?    @default(now()) @updatedAt
+  evaluation  evaluation   @relation(fields: [question_id], references: [id])
+}
+
+model playground {
+  id                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  application_id     String               @db.Uuid
+  group_id           String?              @db.Uuid
+  question           String
+  status             String?
+  trained            Boolean?             @default(false)
+  isActive           activeStatus         @default(active)
+  created_at         DateTime             @default(now())
+  updated_at         DateTime?            @default(now()) @updatedAt
+  playground_results playground_results[]
+}
+
+model playground_results {
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  group_id    String       @db.Uuid
+  question_id String       @db.Uuid
+  message     Json
+  user_type   agentType
+  is_liked    Boolean?
+  isActive    activeStatus @default(active)
+  created_at  DateTime     @default(now())
+  updated_at  DateTime?    @default(now()) @updatedAt
+  playground  playground   @relation(fields: [question_id], references: [id])
+  @@unique([question_id, user_type])
+}
+
+model test_evaluation_group {
+  id                            String                          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                          String
+  model_name                    String?
+  prompt                        String?
+  file_name                     String
+  application_id                String                          @db.Uuid
+  created_at                    DateTime                        @default(now())
+  updated_at                    DateTime?                       @default(now()) @updatedAt
+  application                   application                     @relation(fields: [application_id], references: [id], onDelete: Cascade)
+  test_evaluation_group_dataset test_evaluation_group_dataset[]
+}
+
+model test_evaluation_group_dataset {
+  id                           String                         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  query                        String
+  source_table                 String
+  verified_sql                 String?
+  test_evaluation_group_id     String                         @db.Uuid
+  created_at                   DateTime                       @default(now())
+  updated_at                   DateTime?                      @default(now()) @updatedAt
+  test_evaluation_group        test_evaluation_group          @relation(fields: [test_evaluation_group_id], references: [id], onDelete: Cascade)
+  test_evaluation_group_result test_evaluation_group_result[]
+}
+
+model test_evaluation_group_result {
+  id                               String                        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  model_name                       String
+  input_question                   String
+  sql                              String?
+  relevent_schema                  Json?
+  llm_Structured_output            Json?
+  metaData                         Json?
+  metaDataCount                    Int?
+  QueryEvaluationStatus            QueryEvaluationStatus         @default(null)
+  token_usage                      Int?
+  error_message                    String?
+  feedback                         String?
+  test_evaluation_group_dataset_id String                        @db.Uuid
+  status                           Boolean
+  created_at                       DateTime                      @default(now())
+  updated_at                       DateTime                      @default(now()) @updatedAt
+  test_evaluation_group_dataset    test_evaluation_group_dataset @relation(fields: [test_evaluation_group_dataset_id], references: [id], onDelete: Cascade)
+}
+
+model workflow_entry {
+  id                  String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  message             String
+  workflow_session_id String           @db.Uuid
+  user_type           agentType
+  created_at          DateTime         @default(now())
+  updated_at          DateTime         @default(now()) @updatedAt
+  meta_data           Json?
+  workflow_session    workflow_session @relation(fields: [workflow_session_id], references: [id])
+}
+
+model workflow_session {
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workflow_chat_id String?          @db.Uuid
+  application_id   String           @db.Uuid
+  user_id          String           @db.Uuid
+  created_at       DateTime         @default(now())
+  updated_at       DateTime         @default(now()) @updatedAt
+  executed_status  Boolean          @default(false)
+  application      application      @relation(fields: [application_id], references: [id], onDelete: Cascade)
+  chat             chat?            @relation("WorkflowSessionChat", fields: [workflow_chat_id], references: [id])
+  meta_data        Json?
+  workflow_entry   workflow_entry[]
+  user             user             @relation("WorkflowSession", fields: [user_id], references: [id])
+}
+
+model wallet {
+  id                         String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  wallet_admin_user_id       String                       @db.Uuid
+  self_service_usage_credit  Decimal
+  insights_usage_credit      Decimal
+  actions_usage_credit       Decimal
+  workspace_id               String
+  wallet_overAll_credit      Decimal
+  is_active                  activeStatus                 @default(active)
+  is_subsription_active      Boolean                      @default(false)
+  created_at                 DateTime                     @default(now())
+  updated_at                 DateTime                     @default(now()) @updatedAt
+  meta_data                  Json?
+  user                       user                         @relation("WalletAdmin", fields: [wallet_admin_user_id], references: [id])
+  wallet_subscription_status wallet_subscription_status[]
+  walletTransaction          walletTransaction[]
+}
+
+model wallet_subscription_status {
+  id                      String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  wallet_id               String       @db.Uuid
+  subscription_start_date DateTime
+  subscription_end_date   DateTime
+  is_active               activeStatus @default(active)
+  created_at              DateTime     @default(now())
+  updated_at              DateTime     @default(now()) @updatedAt
+  meta_data               Json?
+  wallet                  wallet       @relation(fields: [wallet_id], references: [id])
+}
+
+enum CreditType {
+  SUBSCRIPTION_CREDIT
+  PAYG_TOPUP
+  AUTO_TOPUP
+  ADMIN_ADJUSTMENT
+}
+
+enum TransactionFlow {
+  CREDIT
+  DEBIT
+}
+
+enum UsageType {
+  SYMENTIC_LAYER_TRAINING
+  SELF_SERVICE
+  INSIGHTS
+  ACTIONS
+  DASHBOARD_REPORTS
+  PLAYGROUND
+  EVALUATION
+  DASHBOARD_PRESENTATION
+}
+
+model walletTransaction {
+  id               String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  wallet_id        String          @db.Uuid
+  transaction_flow TransactionFlow
+  credit_type      CreditType?
+  usage_type       UsageType?
+  credit           Decimal
+  balance_before   Decimal
+  balance_after    Decimal
+  user_id          String          @db.Uuid
+  metadata         Json?
+  is_active        activeStatus    @default(active)
+  created_at       DateTime        @default(now())
+  updated_at       DateTime        @default(now()) @updatedAt
+  wallet           wallet          @relation(fields: [wallet_id], references: [id])
+  user             user            @relation("WalletTransactionBy", fields: [user_id], references: [id])
+  @@index([usage_type])
+  @@index([wallet_id])
+  @@index([user_id])
+  @@index([credit_type])
+  @@index([transaction_flow])
+}
+
+model workspace {
+  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name            String
+  domain_name     String
+  tenant_id       String?
+  is_active       activeStatus      @default(active)
+  created_at      DateTime          @default(now())
+  updated_at      DateTime          @default(now()) @updatedAt
+  metadata        Json?
+  application     application[]
+  business        business[]
+  workspace_users workspace_users[]
+  kpi             kpi[]
+  actions         actions[]
+  currency        String?
+  logo            String?
+}
+
+model business {
+  id           String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  description  String?
+  website      String?
+  location     String?
+  timezone     String?
+  is_active    activeStatus @default(active)
+  created_at   DateTime     @default(now())
+  updated_at   DateTime     @default(now()) @updatedAt
+  metadata     Json?
+  context      String?
+  workspace_id String       @db.Uuid
+  workspace    workspace    @relation(fields: [workspace_id], references: [id])
+}
+
+model context_folder {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  is_active      activeStatus @default(active)
+  created_at     DateTime     @default(now())
+  updated_at     DateTime     @default(now()) @updatedAt
+  metadata       Json?
+  application_id String?      @db.Uuid
+  folder_name    String?
+  application    application? @relation(fields: [application_id], references: [id])
+  user_id        String?      @db.Uuid
+  tenant_id      String?
+  user           user?        @relation(fields: [user_id], references: [id])
+  document       document[]
+}
+
+model document {
+  id                String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  is_active         activeStatus    @default(active)
+  created_at        DateTime        @default(now())
+  updated_at        DateTime        @default(now()) @updatedAt
+  metadata          Json?
+  content           String?
+  folder_id         String?         @db.Uuid
+  folder            context_folder? @relation(fields: [folder_id], references: [id])
+  vector_context_id String?
+  context_title     String?
+  context_tags      String[]        @default([])
+}
+
+model email_otp {
+  id         String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  is_active  activeStatus @default(active)
+  created_at DateTime     @default(now())
+  updated_at DateTime     @default(now()) @updatedAt
+  metadata   Json?
+  otp        String?
+  expires_at DateTime?
+  email      String?
+}
+
+model kpi {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  is_active      activeStatus @default(active)
+  created_at     DateTime     @default(now())
+  updated_at     DateTime     @default(now()) @updatedAt
+  metadata       Json?
+  name           String?
+  description    String?
+  formula        String?
+  application_id String?      @db.Uuid
+  workspace_id   String?      @db.Uuid
+  sql_query      String?
+  mastra_kpi_id  String?
+  kpi_value      Float?
+  query_result   Json?
+  kpi_tables     KpiTable[]
+  category       category[]
+  application    application? @relation(fields: [application_id], references: [id], onDelete: Cascade)
+  workspace      workspace?   @relation(fields: [workspace_id], references: [id], onDelete: Cascade)
+  insight        insight_v2[]
+  insights       KPIInsight[]
+}
+
+model KPIInsight {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  kpi_id     String @db.Uuid
+  insight_id String
+  kpi     kpi        @relation(fields: [kpi_id], references: [id], onDelete: Cascade)
+  insight insight_v2 @relation(fields: [insight_id], references: [id], onDelete: Cascade)
+  @@unique([kpi_id, insight_id])
+}
+
+model KpiTable {
+  id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  kpi_id   String @db.Uuid
+  table_id String @db.Uuid
+  kpi        kpi        @relation(fields: [kpi_id], references: [id], onDelete: Cascade)
+  data_table data_table @relation(fields: [table_id], references: [id], onDelete: Cascade)
+  kpi_columns KpiColumn[]
+}
+
+model KpiColumn {
+  id           String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  kpi_table_id String @db.Uuid
+  column_name  String
+  kpi_table KpiTable @relation(fields: [kpi_table_id], references: [id], onDelete: Cascade)
+}
+
+model insight_v2 {
+  id            String       @id @default(uuid())
+  applicationId String       @db.Uuid
+  kpi_id        String       @db.Uuid
+  alert_value   Float?
+  alert_type    String?
+  alert_status  Boolean      @default(false)
+  user_id       String       @db.Uuid
+  groupId       String?
+  topic         String
+  description   String
+  kpi_value     Float? 
+  frequency     String? 
+    schedules     Json? 
+  schedule_time DateTime? 
+  weekly_day    String? 
+  monthly_day   Int? 
+  unlocked      Boolean      @default(false)
+  sql_query     String? 
+  status        Boolean      @default(false) 
+  isActive      activeStatus @default(active)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @default(now()) @updatedAt
+  metaData      Json?
+  application   application  @relation(fields: [applicationId], references: [id])
+  kpi           kpi          @relation(fields: [kpi_id], references: [id])
+  historical_data_query String?
+  last_sent_at          DateTime?
+  hidden_insight        Boolean?     @default(false)
+  alert_kpi_id          String?
+  alert_kpi_name        String?
+  cron_time             String?
+  parentId              String?
+  parent                insight_v2?  @relation("InsightChildren", fields: [parentId], references: [id])
+  children              insight_v2[] @relation("InsightChildren")
+  kpis                  KPIInsight[] 
+}
+
+model notification {
+  id            String       @id @default(uuid())
+  user_id       String       @db.Uuid
+  message       String?
+  type          String? 
+  is_read       Boolean      @default(false)
+  status        Boolean      @default(false)
+  topic         String?
+  isActive      activeStatus @default(active)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @default(now()) @updatedAt
+  metaData      Json?
+  user          user         @relation(fields: [user_id], references: [id])
+  applicationId String       @db.Uuid
+  application   application  @relation(fields: [applicationId], references: [id])
+}
+
+model insight_execution_log {
+  id                 String       @id @default(uuid())
+  status             Boolean      @default(false)
+  isActive           activeStatus @default(active)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @default(now()) @updatedAt
+  generated_metaData Json?
+  insightv2_id       String?
+  sql_query          String?
+  sql_execution_data Json?
+  executed_metaData  Json?
+  kpi_name           String?
+  frequency                 String? 
+  schedule_time             DateTime?
+  weekly_day                String? 
+  monthly_day               Int?
+  scheduled_kpi_value       Float?
+  kpi_value                 Float?
+  diagnostic_execution_data Json?
+}
+
+model insight_prescriptive_predective_log {
+  id                 String       @id @default(uuid())
+  status             Boolean      @default(false)
+  isActive           activeStatus @default(active)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @default(now()) @updatedAt
+  generated_metaData Json?
+  insightv2_id       String?     
+  executed_metaData  Json?
+  kpi_name           String?
+  frequency                 String? 
+  summary             String?
+  prescriptive_recommendation Json?
+  predictive_forecasts Json?
+  highlights Json?
+}
+model insight_job_logs {
+  id                 String       @id @default(uuid()) @db.Uuid
+  status             Boolean      @default(false)
+  isActive           activeStatus @default(active)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @default(now()) @updatedAt
+  generated_metaData Json?
+  insightv2_id       String?
+  sql_query          String?
+  sql_execution_data Json?
+  executed_metaData  Json?
+  kpi_name           String?
+  kpi_id             String?
+  frequency                 String? 
+  schedule_time             String? 
+  weekly_day                String? 
+  monthly_day               Int?
+  executed_from     String?
+  executed_status  String?
+  error_log      Json?
+  success_log    Json?
+}
+
+model insight_history_log {
+  id                 String       @id @default(uuid())
+  status             Boolean      @default(false)
+  isActive           activeStatus @default(active)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @default(now()) @updatedAt
+  generated_metaData Json?
+  insightv2_id       String?
+  sql_query          String?
+  sql_execution_data Json?
+  executed_metaData  Json?
+  kpi_name           String?
+  kpi_id             String?
+  from_time          DateTime?
+  to_time            DateTime?
+  frequency                 String? 
+  schedule_time             DateTime? 
+  weekly_day                String? 
+  monthly_day               Int?
+  scheduled_kpi_value       Float?
+  kpi_value                 Float?
+  diagnostic_execution_data Json?
+  execution_type          String?
+  dates                  Json?
+  filter_name    String?
+}
+
+model actions {
+  id            String       @id @default(uuid())
+  user_mail     String?      @unique
+  configuration Json?
+  type          actionType?
+  workspace_id  String?      @db.Uuid
+  isActive      activeStatus @default(active)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @default(now()) @updatedAt
+  workspace workspace? @relation(fields: [workspace_id], references: [id])
+}
